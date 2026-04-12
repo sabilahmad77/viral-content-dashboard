@@ -42,3 +42,7 @@ Thumbs.db
 
 # Coverage
 coverage/
+.next/
+dist/
+apps/web/.next/
+apps/api/dist/
