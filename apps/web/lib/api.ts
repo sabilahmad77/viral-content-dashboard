@@ -1,4 +1,7 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+// Use relative URLs so requests go through the Next.js proxy route (app/api/[...path]).
+// The proxy forwards to the backend using the server-side API_URL env var.
+// This means the backend URL never gets baked into the JS bundle.
+const API_URL = '';
 
 interface RequestOptions extends RequestInit {
   token?: string;
