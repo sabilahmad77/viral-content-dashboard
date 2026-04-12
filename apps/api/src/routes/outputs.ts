@@ -68,20 +68,24 @@ async function resolveOutputUrl(
 }
 
 // ── 10 distinct visual variations (mirrors jobWorker) ────────────────────────
+// Rules for every variation:
+//   • NEVER replace the background location/scene — only shift its lighting and color tones
+//   • NEVER produce a plain solid background (no plain white, black, grey studio backdrop)
+//   • Clothing COLOR may shift slightly; clothing STYLE stays the same
 const IMAGE_VARIATIONS: string[] = [
-  'Bright natural morning daylight. Cool blue-tinted background atmosphere. Subject wearing deep navy blue.',
-  'Dramatic overcast dramatic lighting. Stormy grey cloud-toned background. Subject wearing dark charcoal grey.',
-  'Warm golden-hour sunset lighting. Amber and orange tinted background glow. Subject wearing warm brown or khaki.',
-  'Sharp professional studio lighting. Very dark almost-black background. Subject in formal black attire.',
-  'Clean soft diffused daylight. Neutral off-white or light grey background. Subject in mid-grey clothing.',
-  'Slightly left-facing subject angle. Sunlit outdoor location. Background with olive and forest green tones.',
-  'Slightly right-facing subject angle. Indoor formal setting background. Subject in steel blue or slate clothing.',
-  'Low dramatic light from below. Dark dramatic nearly-black background. Midnight navy or dark indigo clothing.',
-  'Soft overhead diffused light. Warm cream and beige background palette. Caramel or tan brown clothing.',
-  'Cool crisp outdoor light. Green foliage or trees visible in background. Forest green or army green clothing.',
+  'Lighting: bright cool morning daylight — shift the entire scene to a cool blue-tinted atmosphere. Keep the original background location exactly; only tint it cool/blue. Shift subject clothing to deep navy blue.',
+  'Lighting: dramatic overcast — shift scene tones to stormy grey and muted. Keep the original background location exactly; only darken and grey its tones. Shift subject clothing to dark charcoal grey.',
+  'Lighting: warm golden-hour — bathe the entire scene in amber and orange glow. Keep the original background location exactly; only warm its tones. Shift subject clothing to warm brown or khaki.',
+  'Lighting: strong side-key light from the left — creates directional shadows across scene. Keep the original background location exactly; deepen its tones slightly. Shift subject clothing to deep burgundy or dark red.',
+  'Lighting: clean soft front-fill light — even, shadow-free, bright. Keep the original background location exactly; lighten and clarify its tones without bleaching to white. Shift subject clothing to mid-grey.',
+  'Lighting: sunlit outdoor — bright natural daylight with slight warmth. Keep the original background location exactly; add subtle warm sunlit highlights. Subject angle slightly left-facing (5° max). Shift subject clothing to olive green.',
+  'Lighting: cool indoor formal — controlled cool-white light. Keep the original background location exactly; cool down its color temperature. Subject angle slightly right-facing (5° max). Shift subject clothing to steel blue.',
+  'Lighting: low dramatic uplight — light source from below creating dramatic shadows upward. Keep the original background location exactly; add dramatic shadow depth. Shift subject clothing to midnight navy or dark indigo.',
+  'Lighting: soft warm overhead — diffused warm ceiling light. Keep the original background location exactly; add warm cream and beige tones. Shift subject clothing to caramel or tan brown.',
+  'Lighting: crisp cool daylight — sharp, clear, cool-temperature natural light. Keep the original background location exactly; shift its tones to cool greens and teals. Shift subject clothing to forest green.',
 ];
 
-// Append variation + circle rule to the template (template stays primary, we only add at end)
+// Append variation + background rule + circle rule to the template (template stays primary)
 function appendSlotVariation(templatePrompt: string, slotIndex: number, hasBaseImage: boolean): string {
   if (!hasBaseImage) return templatePrompt;
   const variation = IMAGE_VARIATIONS[slotIndex % IMAGE_VARIATIONS.length];
@@ -90,8 +94,12 @@ function appendSlotVariation(templatePrompt: string, slotIndex: number, hasBaseI
     `\n\n================================================================================\n` +
     `SLOT VARIATION #${slotIndex + 1} OF 10 — APPLY FOR UNIQUENESS\n` +
     `================================================================================\n` +
-    `For this specific slot, apply this visual style to differentiate it from other slots:\n` +
+    `For this specific slot only, apply this lighting and color variation:\n` +
     `${variation}\n\n` +
+    `BACKGROUND RULE (CRITICAL): You MUST keep the original background location and scene from the\n` +
+    `base image — only shift its lighting and color tones per the variation above. NEVER replace the\n` +
+    `background with a plain solid color. NEVER use a plain white, plain black, or plain grey studio\n` +
+    `backdrop. The background must remain contextually relevant to the original (same setting/location).\n\n` +
     `CIRCLE RULE (CRITICAL): The base image already has a circular portrait overlay (white-bordered\n` +
     `circle, top-left corner, showing a person's face). You MUST preserve this circle EXACTLY as-is —\n` +
     `same position, same white border, same face inside. Do NOT add a second circle on top of it.\n` +
