@@ -6,7 +6,9 @@ import { generateVideoKling } from '../services/kling';
 import { uploadUrlToR2, uploadToR2 } from '../services/storage';
 import { hashPrompt, getCached, setCached } from '../lib/cache';
 import { buildCaptionSystemPrompt, buildImagePrompt } from '../routes/templates';
-import { addCircularOverlay } from '../services/imageComposite';
+// imageComposite removed — circular overlays are preserved by the AI editing the base image,
+// not added programmatically. Adding a programmatic circle on top of an image that already
+// has a circle from the original causes a double-circle bug.
 import { config } from '../lib/config';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -96,19 +98,66 @@ async function handleDataUrl(dataUrl: string, jobId: string, slotId: string, ext
   return uploadToR2(buffer, key, mimeType);
 }
 
+// ── 10 distinct visual variations for image uniqueness ───────────────────────
+// Each image slot in a batch gets its own variation so that generating 10 images
+// from the same base produces clearly different outputs (50%+ visually different).
+// Extend this array if more slots are ever added.
+const IMAGE_VARIATIONS: string[] = [
+  'Bright natural morning daylight. Cool blue-tinted background atmosphere. Subject wearing deep navy blue.',
+  'Dramatic overcast dramatic lighting. Stormy grey cloud-toned background. Subject wearing dark charcoal grey.',
+  'Warm golden-hour sunset lighting. Amber and orange tinted background glow. Subject wearing warm brown or khaki.',
+  'Sharp professional studio lighting. Very dark almost-black background. Subject in formal black attire.',
+  'Clean soft diffused daylight. Neutral off-white or light grey background. Subject in mid-grey clothing.',
+  'Slightly left-facing subject angle. Sunlit outdoor location. Background with olive and forest green tones.',
+  'Slightly right-facing subject angle. Indoor formal setting background. Subject in steel blue or slate clothing.',
+  'Low dramatic light from below. Dark dramatic nearly-black background. Midnight navy or dark indigo clothing.',
+  'Soft overhead diffused light. Warm cream and beige background palette. Caramel or tan brown clothing.',
+  'Cool crisp outdoor light. Green foliage or trees visible in background. Forest green or army green clothing.',
+];
+
+function getImageVariation(slotIndex: number): string {
+  return IMAGE_VARIATIONS[slotIndex % IMAGE_VARIATIONS.length];
+}
+
 // ── Build an EDIT-mode image prompt when a base image is present ─────────────
-// When the user uploads a base image, every slot must EDIT that image rather
-// than create a new scene. This wrapper enforces that regardless of template JSON.
-function wrapWithEditInstruction(slotPrompt: string, hasBaseImage: boolean): string {
+// Rules enforced on every edit regardless of template content:
+//   1. PRESERVE the circular portrait overlay (top-left circle with person inside) EXACTLY
+//   2. REMOVE all text, logos, watermarks, Anonymous mask logo, any overlay text
+//   3. Keep the main subject's face direction nearly identical (±5 degrees max)
+//   4. Keep clothing style identical; only the COLOR may shift slightly per variation
+//   5. Change the background noticeably but keep it contextually relevant
+//   6. Return exactly ONE image — no collages, panels, grids, or double exposures
+//   7. Apply the variation style for this slot to ensure uniqueness
+function wrapWithEditInstruction(slotPrompt: string, hasBaseImage: boolean, slotIndex = 0): string {
   if (!hasBaseImage) return slotPrompt;
+  const variation = getImageVariation(slotIndex);
   return (
-    `Edit the uploaded base image. Do not generate a completely new or unrelated image from scratch. ` +
-    `Return exactly one finished image. ` +
-    `The output must remain clearly derived from the uploaded base image. ` +
-    `Preserve the original structure, subjects, people, objects, background, and overall concept of the source image. ` +
-    `Do NOT add new people, objects, or backgrounds that were not in the original. ` +
-    `Do NOT output a collage, grid, or multiple panels — exactly ONE image. ` +
-    `Apply ONLY these specific visual changes to the base image: ${slotPrompt}`
+    `Edit the uploaded base image following these rules in strict order:\n\n` +
+
+    `RULE 1 — PRESERVE CIRCULAR PORTRAIT: The base image has a circular portrait overlay ` +
+    `(a person's photo inside a white-bordered circle, positioned top-left). ` +
+    `Keep this circle EXACTLY as it appears — same position, same size, same white border, same person inside. ` +
+    `Do NOT remove it, move it, resize it, or replace it. Do NOT add a second circle. ` +
+    `There must be EXACTLY ONE circle in the output.\n\n` +
+
+    `RULE 2 — REMOVE ALL TEXT AND LOGOS: Remove every text element, headline, caption, ` +
+    `Anonymous mask logo, watermark, banner, or overlay that was in the original. ` +
+    `The output image must be completely clean of text and logos.\n\n` +
+
+    `RULE 3 — PRESERVE MAIN SUBJECT: Keep the main foreground subject (person, figure) ` +
+    `with the same face, same face direction (within ±5 degrees), same body position. ` +
+    `Do NOT change the person's identity, face structure, or expression significantly.\n\n` +
+
+    `RULE 4 — CLOTHING COLOR VARIATION: Keep the same style and type of clothing. ` +
+    `Apply this variation's color scheme: ${variation}\n\n` +
+
+    `RULE 5 — BACKGROUND CHANGE: Change the background noticeably but keep it relevant ` +
+    `to the original context. The new background must feel authentic and realistic.\n\n` +
+
+    `RULE 6 — SINGLE IMAGE OUTPUT: Output exactly ONE image. No collages, no panels, ` +
+    `no grids, no double exposures, no side-by-side comparisons.\n\n` +
+
+    `Additional instructions: ${slotPrompt}`
   );
 }
 
@@ -145,9 +194,11 @@ async function resolveSlotPrompt(
     }
 
     if (slot.slotType === 'image' && imageTxt) {
-      // Use the TXT instruction verbatim — it already contains all editing rules.
-      // Do NOT wrap with wrapWithEditInstruction; the user wrote the prompt themselves.
-      return { type: 'image', model: snap.model, label, prompt: imageTxt };
+      // Wrap the admin's image instructions with the full edit rules + per-slot variation.
+      // This ensures circle preservation, text removal, and uniqueness on every slot.
+      const slotIdx = snap.index !== undefined ? Number(snap.index) : (slot.slotIndex ?? 0);
+      const prompt = wrapWithEditInstruction(imageTxt, hasBaseImage, slotIdx);
+      return { type: 'image', model: snap.model, label, prompt };
     }
 
     if (slot.slotType === 'video' && videoTxt) {
@@ -156,10 +207,9 @@ async function resolveSlotPrompt(
     }
 
     // ── Image slot with base image but no TXT instruction set ───────────────
-    // When a base image is uploaded, NEVER fall through to "Create a Hero Shot..."
-    // slot defaults. Always use edit-mode, even without a custom template.
     if (slot.slotType === 'image' && hasBaseImage) {
-      const prompt = wrapWithEditInstruction('Refine and enhance the image.', true);
+      const slotIdx = snap.index !== undefined ? Number(snap.index) : (slot.slotIndex ?? 0);
+      const prompt = wrapWithEditInstruction('Refine and enhance the image quality.', true, slotIdx);
       return { type: 'image', model: snap.model, label, prompt };
     }
 
@@ -177,9 +227,9 @@ async function resolveSlotPrompt(
 
   // No active template → fall back to the snapshot stored at job creation
   const fallback = parseJson(slot.promptSnapshot) as Omit<ResolvedPrompt, 'type' | 'model' | 'label'>;
-  // Image slots with a base image: always use edit-mode, never "Create a..."
   if (slot.slotType === 'image' && hasBaseImage) {
-    const prompt = wrapWithEditInstruction('Refine and enhance the image.', true);
+    const slotIdx = snap.index !== undefined ? Number(snap.index) : (slot.slotIndex ?? 0);
+    const prompt = wrapWithEditInstruction('Refine and enhance the image quality.', true, slotIdx);
     return { type: snap.type, model: snap.model, label, ...fallback, prompt };
   }
   return { type: snap.type, model: snap.model, label, ...fallback };
@@ -259,17 +309,10 @@ async function processSlot(
           url = await handleDataUrl(url, slot.jobId, slot.id, 'png', 'image/png');
         }
 
-        // ── Req 27-32: Add circular overlay (white-border thumbnail, top-left) ─
-        // The circular element uses the same edited image — same editing rules
-        // automatically applied since it derives from the same output.
-        try {
-          console.log(`  ⭕ [slot ${slot.slotIndex}] Compositing circular overlay...`);
-          url = await addCircularOverlay(url, { circleSize: 210, borderPx: 6, posX: 28, posY: 28 });
-          console.log(`  ✓ [slot ${slot.slotIndex}] Circular overlay composited`);
-        } catch (compErr) {
-          // Non-fatal — log but keep the image without the circle
-          console.warn(`  ⚠ [slot ${slot.slotIndex}] Circular overlay failed (keeping plain edit):`, (compErr as Error).message);
-        }
+        // NOTE: No programmatic circular overlay is added here.
+        // The AI editing prompt (RULE 1 in wrapWithEditInstruction) explicitly instructs
+        // the model to PRESERVE the existing circle from the base image exactly.
+        // Adding a second circle programmatically was causing the double-circle bug.
 
       } else {
         // ── NO BASE IMAGE: standard generation ──────────────────────────────────
@@ -483,4 +526,4 @@ jobQueue.on('job', async (job: { id: string; data: { jobId: string } }) => {
   }
 });
 
-console.log('✅ Job worker ready — v9: hashtag-injection, gemini-2.5-flash-lite, 2.5s-gap');
+console.log('✅ Job worker ready — v10: no-double-circle, 10-variation-uniqueness, circle-preserve-prompt, text-logo-removal');

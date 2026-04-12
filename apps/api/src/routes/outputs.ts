@@ -8,7 +8,7 @@ import {
   validateCaptionStructure,
 } from '../services/openai';
 import { generateCaptionGemini, generateImageGemini, GeminiImageUnavailableError } from '../services/gemini';
-import { addCircularOverlay } from '../services/imageComposite';
+// addCircularOverlay removed — circle is preserved by the AI edit prompt, not added programmatically
 import { config } from '../lib/config';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -67,9 +67,42 @@ async function resolveOutputUrl(
   return url;
 }
 
+// ── 10 distinct visual variations (mirrors jobWorker) ────────────────────────
+const IMAGE_VARIATIONS: string[] = [
+  'Bright natural morning daylight. Cool blue-tinted background atmosphere. Subject wearing deep navy blue.',
+  'Dramatic overcast dramatic lighting. Stormy grey cloud-toned background. Subject wearing dark charcoal grey.',
+  'Warm golden-hour sunset lighting. Amber and orange tinted background glow. Subject wearing warm brown or khaki.',
+  'Sharp professional studio lighting. Very dark almost-black background. Subject in formal black attire.',
+  'Clean soft diffused daylight. Neutral off-white or light grey background. Subject in mid-grey clothing.',
+  'Slightly left-facing subject angle. Sunlit outdoor location. Background with olive and forest green tones.',
+  'Slightly right-facing subject angle. Indoor formal setting background. Subject in steel blue or slate clothing.',
+  'Low dramatic light from below. Dark dramatic nearly-black background. Midnight navy or dark indigo clothing.',
+  'Soft overhead diffused light. Warm cream and beige background palette. Caramel or tan brown clothing.',
+  'Cool crisp outdoor light. Green foliage or trees visible in background. Forest green or army green clothing.',
+];
+
+function buildEditPrompt(basePrompt: string, slotIndex: number, hasBaseImage: boolean): string {
+  if (!hasBaseImage) return basePrompt;
+  const variation = IMAGE_VARIATIONS[slotIndex % IMAGE_VARIATIONS.length];
+  return (
+    `Edit the uploaded base image following these rules in strict order:\n\n` +
+    `RULE 1 — PRESERVE CIRCULAR PORTRAIT: The base image has a circular portrait overlay ` +
+    `(a person's photo inside a white-bordered circle, positioned top-left). ` +
+    `Keep this circle EXACTLY as it appears — same position, same size, same white border, same person inside. ` +
+    `Do NOT remove it, move it, resize it, or replace it. Do NOT add a second circle. ` +
+    `There must be EXACTLY ONE circle in the output.\n\n` +
+    `RULE 2 — REMOVE ALL TEXT AND LOGOS: Remove every text element, headline, caption, ` +
+    `Anonymous mask logo, watermark, banner, or overlay that was in the original.\n\n` +
+    `RULE 3 — PRESERVE MAIN SUBJECT: Keep the main foreground subject with the same face, ` +
+    `same face direction (within ±5 degrees), same body position.\n\n` +
+    `RULE 4 — CLOTHING COLOR VARIATION: Keep the same clothing style. Apply this variation: ${variation}\n\n` +
+    `RULE 5 — BACKGROUND CHANGE: Change the background noticeably but keep it contextually relevant.\n\n` +
+    `RULE 6 — SINGLE IMAGE: Output exactly ONE image. No collages, panels, grids, or double exposures.\n\n` +
+    `Additional instructions: ${basePrompt}`
+  );
+}
+
 // ── Resolve the live prompt for this slot ─────────────────────────────────────
-// Re-reads the active template from DB on every regen — same as the job worker.
-// This ensures template changes take effect immediately on Recreate clicks.
 type SlotInfo = { slotType: string; modelUsed: string | null; promptSnapshot: unknown; slotIndex?: number };
 
 async function resolveLivePrompt(
@@ -78,8 +111,9 @@ async function resolveLivePrompt(
 ): Promise<{ system?: string; user?: string; prompt?: string; model: string }> {
   const snap = parseJsonField(slot.promptSnapshot) as Record<string, unknown>;
   const model = slot.modelUsed ?? '';
+  const slotIdx = slot.slotIndex ?? 0;
+  const hasBase = !!baseImageUrl;
 
-  // Always re-read the active template (same principle as jobWorker.resolveSlotPrompt)
   const template = await db.promptTemplate.findFirst({ where: { isActive: true } });
 
   if (template) {
@@ -87,30 +121,21 @@ async function resolveLivePrompt(
     const imageTxt = ((template.imageInstructions as string) ?? '').trim();
 
     if (slot.slotType === 'caption' && contentTxt) {
-      const captionNumber = (slot.slotIndex ?? 0) + 1;
+      const captionNumber = slotIdx + 1;
       const uniquenessNote = `\n\nThis is caption #${captionNumber}. It MUST be completely unique — a different opening hook, different emotional angle, different paragraph structure, different tone. Do NOT repeat any phrases or ideas from other captions in this batch.`;
       const baseUser = String(snap.user ?? 'Generate a caption following the provided instructions exactly.');
-      const userMsg = `Caption #${captionNumber}. ${baseUser}${uniquenessNote}`;
-      return { model, system: contentTxt, user: userMsg };
+      return { model, system: contentTxt, user: `Caption #${captionNumber}. ${baseUser}${uniquenessNote}` };
     }
 
     if (slot.slotType === 'image' && imageTxt) {
-      return { model, prompt: imageTxt };
+      return { model, prompt: buildEditPrompt(imageTxt, slotIdx, hasBase) };
     }
 
-    // Image with base image but no template text → safe edit fallback
-    if (slot.slotType === 'image' && baseImageUrl) {
-      return {
-        model,
-        prompt:
-          'Edit the uploaded base image. Preserve its exact composition, subjects, and scene. ' +
-          'Remove any watermarks, logos, borders, or text. Keep the result realistic and clean. ' +
-          'Do NOT generate a new scene or composition.',
-      };
+    if (slot.slotType === 'image' && hasBase) {
+      return { model, prompt: buildEditPrompt('Refine and enhance the image quality.', slotIdx, true) };
     }
   }
 
-  // Final fallback: use the frozen snapshot exactly as stored
   return {
     model,
     system: String(snap.system ?? ''),
@@ -180,13 +205,7 @@ async function callAI(
 
       // Persist data URL to R2 if configured
       url = await resolveOutputUrl(url, jobId, slotId, regenVersion, 'png', 'image/png');
-
-      // Req 27-32: Circular overlay — white-border thumbnail, top-left
-      try {
-        url = await addCircularOverlay(url, { circleSize: 210, borderPx: 6, posX: 28, posY: 28 });
-      } catch (compErr) {
-        console.warn(`  ⚠ Circular overlay failed (keeping plain edit):`, (compErr as Error).message);
-      }
+      // No programmatic circle added — the AI edit prompt (RULE 1) preserves the existing circle.
 
     } else {
       // No base image — standard Gemini / DALL-E text-to-image
