@@ -70,7 +70,7 @@ async function resolveOutputUrl(
 // ── Resolve the live prompt for this slot ─────────────────────────────────────
 // Re-reads the active template from DB on every regen — same as the job worker.
 // This ensures template changes take effect immediately on Recreate clicks.
-type SlotInfo = { slotType: string; modelUsed: string | null; promptSnapshot: unknown };
+type SlotInfo = { slotType: string; modelUsed: string | null; promptSnapshot: unknown; slotIndex?: number };
 
 async function resolveLivePrompt(
   slot: SlotInfo,

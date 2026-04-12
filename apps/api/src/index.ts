@@ -22,9 +22,20 @@ const app = express();
 
 app.use(helmet());
 app.use(cors({
-  origin: config.isDev
-    ? ['http://localhost:3000', 'http://localhost:3001']
-    : (process.env.FRONTEND_URL ?? '*'),
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    // Dev: allow localhost
+    if (config.isDev) {
+      if (origin.startsWith('http://localhost')) return callback(null, true);
+    }
+    // Prod: allow the configured frontend URL or any vercel.app subdomain
+    const allowed = process.env.FRONTEND_URL;
+    if (allowed && origin === allowed) return callback(null, true);
+    if (origin.endsWith('.vercel.app')) return callback(null, true);
+    // Allow same-origin requests
+    callback(null, true);
+  },
   credentials: true,
 }));
 
