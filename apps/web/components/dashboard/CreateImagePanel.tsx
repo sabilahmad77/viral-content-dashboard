@@ -189,7 +189,7 @@ export default function CreateImagePanel({ onJobCreated, templateName, templateV
             <input {...getInputProps()} />
             <div style={{
               width: 56, height: 56, borderRadius: '16px',
-              background: isDragActive ? 'rgba(34,211,238,0.12)' : 'rgba(255,255,255,0.04)',
+              background: isDragActive ? 'rgba(34,211,238,0.12)' : 'var(--surface-2)',
               border: `1px solid ${isDragActive ? 'rgba(34,211,238,0.5)' : 'var(--border)'}`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all 0.18s',

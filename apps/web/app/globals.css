@@ -324,3 +324,176 @@ input:focus, textarea:focus, select:focus {
   box-shadow: 0 0 0 1px var(--border-accent), var(--shadow-accent);
   border-color: var(--border-accent) !important;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   LIGHT MODE — complete variable + component override
+   ═══════════════════════════════════════════════════════════ */
+@media (prefers-color-scheme: light) {
+  :root {
+    /* ── Core backgrounds ─────────────────────────────────── */
+    --bg: #EEF1F8;
+    --surface: #FFFFFF;
+    --surface-2: #F4F7FC;
+    --surface-3: #E8EEF8;
+    --surface-hover: #DDE5F4;
+
+    /* ── Borders ──────────────────────────────────────────── */
+    --border: #C8D3E8;
+    --border-hover: #A8B8D4;
+    --border-accent: rgba(79, 70, 229, 0.35);
+    --border-gold: rgba(217, 119, 6, 0.35);
+
+    /* ── Primary accent — deeper indigo for light bg ──────── */
+    --accent: #4F46E5;
+    --accent-2: #6366F1;
+    --accent-dim: rgba(79, 70, 229, 0.1);
+    --accent-hover: #4338CA;
+    --accent-glow: 0 0 24px rgba(79, 70, 229, 0.2);
+
+    /* ── Secondary — deeper cyan ──────────────────────────── */
+    --cyan: #0284C7;
+    --cyan-dim: rgba(2, 132, 199, 0.1);
+
+    /* ── Premium gold ─────────────────────────────────────── */
+    --gold: #B45309;
+    --gold-2: #D97706;
+    --gold-dim: rgba(180, 83, 9, 0.1);
+
+    /* ── Status ───────────────────────────────────────────── */
+    --success: #047857;
+    --success-dim: rgba(4, 120, 87, 0.1);
+    --danger: #BE123C;
+    --danger-dim: rgba(190, 18, 60, 0.1);
+    --warning: #B45309;
+    --warning-dim: rgba(180, 83, 9, 0.1);
+
+    /* ── Text ─────────────────────────────────────────────── */
+    --text-primary: #0D1526;
+    --text-secondary: #3D4F6A;
+    --text-muted: #7A8FA8;
+
+    /* ── Premium shadows — lighter for light bg ───────────── */
+    --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.07);
+    --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
+    --shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.1), 0 4px 16px rgba(0, 0, 0, 0.06);
+    --shadow-accent: 0 4px 24px rgba(79, 70, 229, 0.18);
+    --shadow-gold: 0 4px 20px rgba(180, 83, 9, 0.14);
+  }
+
+  /* ── Scrollbar ──────────────────────────────────────────── */
+  ::-webkit-scrollbar-thumb {
+    background: rgba(79, 70, 229, 0.2);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(79, 70, 229, 0.38);
+  }
+
+  /* ── Inputs ─────────────────────────────────────────────── */
+  input, textarea, select {
+    background: #FFFFFF;
+    color: var(--text-primary);
+  }
+  input::placeholder, textarea::placeholder {
+    color: var(--text-muted);
+  }
+
+  /* ── Skeleton shimmer ───────────────────────────────────── */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      #DDE5F4 25%,
+      #C8D6EE 50%,
+      #DDE5F4 75%
+    );
+    background-size: 200% 100%;
+  }
+
+  /* ── Badges ─────────────────────────────────────────────── */
+  .badge-queued {
+    background: rgba(200, 211, 232, 0.6);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+  .badge-pending {
+    background: rgba(220, 228, 244, 0.5);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+  }
+
+  /* ── Card ───────────────────────────────────────────────── */
+  .card {
+    background: #FFFFFF;
+    border-color: var(--border);
+    box-shadow: var(--shadow-md);
+  }
+  .card:hover {
+    border-color: var(--border-hover);
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Buttons ────────────────────────────────────────────── */
+  .btn-ghost {
+    background: rgba(0, 0, 0, 0.04);
+    color: var(--text-secondary);
+    border-color: var(--border);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: rgba(0, 0, 0, 0.08);
+    color: var(--text-primary);
+    border-color: var(--border-hover);
+  }
+
+  .btn-danger {
+    background: rgba(190, 18, 60, 0.08);
+    color: var(--danger);
+    border-color: rgba(190, 18, 60, 0.2);
+  }
+  .btn-danger:hover:not(:disabled) {
+    background: rgba(190, 18, 60, 0.14);
+    box-shadow: 0 2px 8px rgba(190, 18, 60, 0.15);
+  }
+
+  /* ── Section divider ────────────────────────────────────── */
+  .section-divider-line {
+    background: linear-gradient(90deg, var(--border), transparent);
+  }
+
+  /* ── Glass panel ────────────────────────────────────────── */
+  .glass-panel {
+    background: linear-gradient(135deg, #FFFFFF 0%, #F4F7FC 100%);
+    border-color: var(--border);
+    box-shadow: var(--shadow-lg);
+  }
+  .glass-panel::before {
+    background: linear-gradient(
+      135deg,
+      rgba(79, 70, 229, 0.03) 0%,
+      transparent 60%
+    );
+  }
+
+  /* ── Sidebar nav hover ──────────────────────────────────── */
+  /* Override inline rgba(255,255,255,0.04) nav hover — not patchable via CSS
+     but we can make sure anchors inside nav look right */
+  aside nav a:hover {
+    background: rgba(0, 0, 0, 0.05) !important;
+  }
+
+  /* User role badge in sidebar (hardcoded rgba white) */
+  aside .user-role-badge {
+    background: rgba(0, 0, 0, 0.05) !important;
+  }
+
+  /* ── Focus ring ─────────────────────────────────────────── */
+  *:focus-visible {
+    outline-color: rgba(79, 70, 229, 0.7);
+  }
+
+  /* ── Gradient text — keep vivid on light bg ─────────────── */
+  .gradient-text {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--cyan) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}

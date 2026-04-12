@@ -130,7 +130,7 @@ function CaptionCard({ slot, index, onRegen }: { slot: OutputSlot; index: number
     }}
       onMouseEnter={(e) => {
         (e.currentTarget as HTMLDivElement).style.borderColor = accent.border;
-        (e.currentTarget as HTMLDivElement).style.boxShadow = `0 4px 20px rgba(0,0,0,0.4), 0 0 0 1px ${accent.border}`;
+        (e.currentTarget as HTMLDivElement).style.boxShadow = `var(--shadow-md), 0 0 0 1px ${accent.border}`;
       }}
       onMouseLeave={(e) => {
         (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)';
@@ -166,7 +166,7 @@ function CaptionCard({ slot, index, onRegen }: { slot: OutputSlot; index: number
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '10px 16px 12px',
-        borderTop: '1px solid rgba(255,255,255,0.04)',
+        borderTop: '1px solid var(--border)',
       }}>
         <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
           {slot.outputText?.length ?? 0} chars
@@ -314,7 +314,7 @@ function ImageCard({ slot, index, jobId, onRegen }: { slot: OutputSlot; index: n
       }}
         onMouseEnter={(e) => {
           (e.currentTarget as HTMLDivElement).style.borderColor = accent.border;
-          (e.currentTarget as HTMLDivElement).style.boxShadow = `0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px ${accent.border}`;
+          (e.currentTarget as HTMLDivElement).style.boxShadow = `var(--shadow-lg), 0 0 0 1px ${accent.border}`;
         }}
         onMouseLeave={(e) => {
           (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)';
@@ -354,7 +354,7 @@ function ImageCard({ slot, index, jobId, onRegen }: { slot: OutputSlot; index: n
           display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px',
           padding: '9px 10px',
           background: 'var(--surface-3)',
-          borderTop: '1px solid rgba(255,255,255,0.04)',
+          borderTop: '1px solid var(--border)',
         }}>
           <button
             className="btn btn-ghost"

@@ -55,7 +55,7 @@ function NavLink({
       onMouseEnter={(e) => {
         if (!active) {
           (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-primary)';
-          (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(255,255,255,0.04)';
+          (e.currentTarget as HTMLAnchorElement).style.background = 'var(--surface-hover)';
         }
       }}
       onMouseLeave={(e) => {
@@ -219,10 +219,10 @@ export default function Sidebar() {
               Super Admin
             </div>
           ) : (
-            <div style={{
+            <div className="user-role-badge" style={{
               display: 'inline-flex', alignItems: 'center', gap: '6px',
               padding: '4px 10px', borderRadius: '999px',
-              background: 'rgba(255,255,255,0.04)',
+              background: 'var(--surface-2)',
               border: '1px solid var(--border)',
               fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)',
             }}>
