@@ -68,51 +68,69 @@ async function resolveOutputUrl(
 }
 
 // ── 10 distinct visual variations (mirrors jobWorker) ────────────────────────
-// Rules for every variation:
-//   • NEVER replace the background location/scene — only shift its lighting and color tones
-//   • NEVER produce a plain solid background (no plain white, black, grey studio backdrop)
-//   • Clothing COLOR may shift slightly; clothing STYLE stays the same
+// IMPORTANT: Variations are LIGHTING ONLY.
+// Explicit clothing color instructions cause the AI to redesign the entire outfit.
+// Lighting naturally affects perceived color — that is the only acceptable change.
 const IMAGE_VARIATIONS: string[] = [
-  'Lighting: bright cool morning daylight — shift the entire scene to a cool blue-tinted atmosphere. Keep the original background location exactly; only tint it cool/blue. Shift subject clothing to deep navy blue.',
-  'Lighting: dramatic overcast — shift scene tones to stormy grey and muted. Keep the original background location exactly; only darken and grey its tones. Shift subject clothing to dark charcoal grey.',
-  'Lighting: warm golden-hour — bathe the entire scene in amber and orange glow. Keep the original background location exactly; only warm its tones. Shift subject clothing to warm brown or khaki.',
-  'Lighting: strong side-key light from the left — creates directional shadows across scene. Keep the original background location exactly; deepen its tones slightly. Shift subject clothing to deep burgundy or dark red.',
-  'Lighting: clean soft front-fill light — even, shadow-free, bright. Keep the original background location exactly; lighten and clarify its tones without bleaching to white. Shift subject clothing to mid-grey.',
-  'Lighting: sunlit outdoor — bright natural daylight with slight warmth. Keep the original background location exactly; add subtle warm sunlit highlights. Subject angle slightly left-facing (5° max). Shift subject clothing to olive green.',
-  'Lighting: cool indoor formal — controlled cool-white light. Keep the original background location exactly; cool down its color temperature. Subject angle slightly right-facing (5° max). Shift subject clothing to steel blue.',
-  'Lighting: low dramatic uplight — light source from below creating dramatic shadows upward. Keep the original background location exactly; add dramatic shadow depth. Shift subject clothing to midnight navy or dark indigo.',
-  'Lighting: soft warm overhead — diffused warm ceiling light. Keep the original background location exactly; add warm cream and beige tones. Shift subject clothing to caramel or tan brown.',
-  'Lighting: crisp cool daylight — sharp, clear, cool-temperature natural light. Keep the original background location exactly; shift its tones to cool greens and teals. Shift subject clothing to forest green.',
+  'LIGHTING ONLY: Apply cool morning blue-tinted daylight — shift the entire scene to a cool, crisp blue atmosphere.',
+  'LIGHTING ONLY: Apply dramatic overcast grey — shift scene to muted, stormy, desaturated tones.',
+  'LIGHTING ONLY: Apply warm golden-hour lighting — bathe the entire scene in amber and orange glow.',
+  'LIGHTING ONLY: Apply strong directional side-key light from the left — creates natural shadows across the scene.',
+  'LIGHTING ONLY: Apply clean, even, soft front-fill daylight — eliminate harsh shadows, bright and clear.',
+  'LIGHTING ONLY: Apply bright warm outdoor sunlight from slightly above — natural warmth, sunlit highlights.',
+  'LIGHTING ONLY: Apply cool formal indoor lighting — controlled, blue-white, professional temperature.',
+  'LIGHTING ONLY: Apply dramatic low uplight from below — shadows cast dramatically upward.',
+  'LIGHTING ONLY: Apply soft warm overhead diffuse light — gentle, warm, ceiling-lit quality.',
+  'LIGHTING ONLY: Apply crisp sharp cool-temperature daylight — high clarity, cool tones, sharp detail.',
 ];
 
-// Append variation + background rule + circle rule to the template (template stays primary)
-function appendSlotVariation(templatePrompt: string, slotIndex: number, hasBaseImage: boolean): string {
+// Append variation + preservation rules to the template (template stays primary).
+// regenOffset shifts the variation index on each Recreate so you never get the same result twice.
+function appendSlotVariation(templatePrompt: string, slotIndex: number, hasBaseImage: boolean, regenOffset = 0): string {
   if (!hasBaseImage) return templatePrompt;
-  const variation = IMAGE_VARIATIONS[slotIndex % IMAGE_VARIATIONS.length];
+  const variationIdx = (slotIndex + regenOffset) % IMAGE_VARIATIONS.length;
+  const variation = IMAGE_VARIATIONS[variationIdx];
   return (
     templatePrompt +
     `\n\n================================================================================\n` +
-    `SLOT VARIATION #${slotIndex + 1} OF 10 — APPLY FOR UNIQUENESS\n` +
+    `SLOT VARIATION #${variationIdx + 1} — LIGHTING ONLY\n` +
     `================================================================================\n` +
-    `For this specific slot only, apply this lighting and color variation:\n` +
+    `Apply ONLY this lighting change to differentiate this slot from others:\n` +
     `${variation}\n\n` +
-    `BACKGROUND RULE (CRITICAL): You MUST keep the original background location and scene from the\n` +
-    `base image — only shift its lighting and color tones per the variation above. NEVER replace the\n` +
-    `background with a plain solid color. NEVER use a plain white, plain black, or plain grey studio\n` +
-    `backdrop. The background must remain contextually relevant to the original (same setting/location).\n\n` +
-    `CIRCLE RULE (CRITICAL): The base image already has a circular portrait overlay (white-bordered\n` +
-    `circle, top-left corner, showing a person's face). You MUST preserve this circle EXACTLY as-is —\n` +
-    `same position, same white border, same face inside. Do NOT add a second circle on top of it.\n` +
-    `The output must have EXACTLY ONE circle — the original one from the base image.`
+    `================================================================================\n` +
+    `SUBJECT PRESERVATION — NON-NEGOTIABLE (apply before anything else)\n` +
+    `================================================================================\n` +
+    `1. FACE IDENTITY: The main subject's face must be 100% preserved — same person, same face\n` +
+    `   structure, same features. Do NOT alter, remodel, or reimagine the face in any way.\n` +
+    `2. FACE DIRECTION: A tiny turn is allowed (maximum ±5 degrees). No more than that.\n` +
+    `3. CLOTHING: The style, cut, design, and color of all clothing must remain IDENTICAL to the\n` +
+    `   original. Do NOT recolor, redesign, or replace any garment. The lighting change above will\n` +
+    `   naturally affect how colors appear — that is the ONLY acceptable clothing change.\n` +
+    `4. BODY & POSE: The subject's body shape, posture, and positioning must match the original exactly.\n` +
+    `5. NO REIMAGINING: Do not creatively reimagine, redesign, or significantly alter the subject.\n\n` +
+    `================================================================================\n` +
+    `BACKGROUND RULE — KEEP LOCATION, SHIFT TONES ONLY\n` +
+    `================================================================================\n` +
+    `Keep the original background location and scene exactly. Only shift its lighting and color tones\n` +
+    `per the variation above. NEVER replace with a plain solid color (no white/black/grey backdrop).\n\n` +
+    `================================================================================\n` +
+    `CIRCLE RULE — ONE CIRCLE ONLY\n` +
+    `================================================================================\n` +
+    `The base image has a circular portrait overlay (white-bordered circle, top-left, showing a face).\n` +
+    `Preserve it EXACTLY — same position, same size, same white border, same face inside.\n` +
+    `Do NOT add a second circle. Output must have EXACTLY ONE circle.`
   );
 }
 
 // ── Resolve the live prompt for this slot ─────────────────────────────────────
 type SlotInfo = { slotType: string; modelUsed: string | null; promptSnapshot: unknown; slotIndex?: number };
 
+// regenOffset: pass regenCount here so each Recreate picks a different variation index.
+// On initial generation regenOffset=0, on first Recreate regenOffset=1, etc.
 async function resolveLivePrompt(
   slot: SlotInfo,
-  baseImageUrl: string | null
+  baseImageUrl: string | null,
+  regenOffset = 0
 ): Promise<{ system?: string; user?: string; prompt?: string; model: string }> {
   const snap = parseJsonField(slot.promptSnapshot) as Record<string, unknown>;
   const model = slot.modelUsed ?? '';
@@ -133,11 +151,12 @@ async function resolveLivePrompt(
     }
 
     if (slot.slotType === 'image' && imageTxt) {
-      return { model, prompt: appendSlotVariation(imageTxt, slotIdx, hasBase) };
+      // regenOffset shifts variation index on each Recreate → different result every time
+      return { model, prompt: appendSlotVariation(imageTxt, slotIdx, hasBase, regenOffset) };
     }
 
     if (slot.slotType === 'image' && hasBase) {
-      return { model, prompt: appendSlotVariation('Refine and enhance the image quality.', slotIdx, true) };
+      return { model, prompt: appendSlotVariation('Refine and enhance the image quality.', slotIdx, true, regenOffset) };
     }
   }
 
@@ -162,7 +181,8 @@ async function callAI(
   slotId: string,
   regenVersion: number
 ): Promise<{ outputText?: string; outputUrl?: string }> {
-  const resolved = await resolveLivePrompt(slot, baseImageUrl);
+  // Pass regenVersion as offset so each Recreate uses a different variation → different result
+  const resolved = await resolveLivePrompt(slot, baseImageUrl, regenVersion);
   const model = resolved.model;
 
   // ── CAPTION ──────────────────────────────────────────────────────────────────
