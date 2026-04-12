@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Role: SUPER_ADMIN | USER
+// JobStatus: QUEUED | PROCESSING | DONE | FAILED
+// SlotType: caption | image | video
+// SlotStatus: PENDING | PROCESSING | DONE | FAILED
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  passwordHash  String
+  name          String
+  role          String         @default("USER")
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  lastLogin     DateTime?
+  jobs          Job[]
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PromptTemplate {
+  id                  String   @id @default(uuid())
+  name                String
+  slug                String   @unique
+  version             Int      @default(1)
+  isActive            Boolean  @default(false)
+  slots               String   @default("[]")
+  captionPromptJson   String   @default("{}")
+  imagePromptJson     String   @default("{}")
+  contentInstructions String   @default("")
+  imageInstructions   String   @default("")
+  videoInstructions   String   @default("")
+  createdById         String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  jobs                Job[]
+}
+
+model Job {
+  id              String       @id @default(uuid())
+  userId          String
+  templateId      String
+  templateVersion Int
+  newsInput       String
+  baseImageUrl    String?
+  status          String       @default("QUEUED")
+  createdAt       DateTime     @default(now())
+  completedAt     DateTime?
+  errorMsg        String?
+  user            User         @relation(fields: [userId], references: [id])
+  template        PromptTemplate @relation(fields: [templateId], references: [id])
+  outputSlots     OutputSlot[]
+}
+
+model OutputSlot {
+  id             String   @id @default(uuid())
+  jobId          String
+  slotType       String
+  slotIndex      Int
+  status         String   @default("PENDING")
+  outputText     String?
+  outputUrl      String?
+  promptSnapshot String   @default("{}")
+  modelUsed      String?
+  regenCount     Int      @default(0)
+  regenHistory   String   @default("[]")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  job            Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+}
