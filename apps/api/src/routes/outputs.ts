@@ -81,24 +81,21 @@ const IMAGE_VARIATIONS: string[] = [
   'Cool crisp outdoor light. Green foliage or trees visible in background. Forest green or army green clothing.',
 ];
 
-function buildEditPrompt(basePrompt: string, slotIndex: number, hasBaseImage: boolean): string {
-  if (!hasBaseImage) return basePrompt;
+// Append variation + circle rule to the template (template stays primary, we only add at end)
+function appendSlotVariation(templatePrompt: string, slotIndex: number, hasBaseImage: boolean): string {
+  if (!hasBaseImage) return templatePrompt;
   const variation = IMAGE_VARIATIONS[slotIndex % IMAGE_VARIATIONS.length];
   return (
-    `Edit the uploaded base image following these rules in strict order:\n\n` +
-    `RULE 1 — PRESERVE CIRCULAR PORTRAIT: The base image has a circular portrait overlay ` +
-    `(a person's photo inside a white-bordered circle, positioned top-left). ` +
-    `Keep this circle EXACTLY as it appears — same position, same size, same white border, same person inside. ` +
-    `Do NOT remove it, move it, resize it, or replace it. Do NOT add a second circle. ` +
-    `There must be EXACTLY ONE circle in the output.\n\n` +
-    `RULE 2 — REMOVE ALL TEXT AND LOGOS: Remove every text element, headline, caption, ` +
-    `Anonymous mask logo, watermark, banner, or overlay that was in the original.\n\n` +
-    `RULE 3 — PRESERVE MAIN SUBJECT: Keep the main foreground subject with the same face, ` +
-    `same face direction (within ±5 degrees), same body position.\n\n` +
-    `RULE 4 — CLOTHING COLOR VARIATION: Keep the same clothing style. Apply this variation: ${variation}\n\n` +
-    `RULE 5 — BACKGROUND CHANGE: Change the background noticeably but keep it contextually relevant.\n\n` +
-    `RULE 6 — SINGLE IMAGE: Output exactly ONE image. No collages, panels, grids, or double exposures.\n\n` +
-    `Additional instructions: ${basePrompt}`
+    templatePrompt +
+    `\n\n================================================================================\n` +
+    `SLOT VARIATION #${slotIndex + 1} OF 10 — APPLY FOR UNIQUENESS\n` +
+    `================================================================================\n` +
+    `For this specific slot, apply this visual style to differentiate it from other slots:\n` +
+    `${variation}\n\n` +
+    `CIRCLE RULE (CRITICAL): The base image already has a circular portrait overlay (white-bordered\n` +
+    `circle, top-left corner, showing a person's face). You MUST preserve this circle EXACTLY as-is —\n` +
+    `same position, same white border, same face inside. Do NOT add a second circle on top of it.\n` +
+    `The output must have EXACTLY ONE circle — the original one from the base image.`
   );
 }
 
@@ -128,11 +125,11 @@ async function resolveLivePrompt(
     }
 
     if (slot.slotType === 'image' && imageTxt) {
-      return { model, prompt: buildEditPrompt(imageTxt, slotIdx, hasBase) };
+      return { model, prompt: appendSlotVariation(imageTxt, slotIdx, hasBase) };
     }
 
     if (slot.slotType === 'image' && hasBase) {
-      return { model, prompt: buildEditPrompt('Refine and enhance the image quality.', slotIdx, true) };
+      return { model, prompt: appendSlotVariation('Refine and enhance the image quality.', slotIdx, true) };
     }
   }
 

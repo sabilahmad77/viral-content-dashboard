@@ -119,6 +119,28 @@ function getImageVariation(slotIndex: number): string {
   return IMAGE_VARIATIONS[slotIndex % IMAGE_VARIATIONS.length];
 }
 
+// ── Append variation + circle rule to the EXISTING template ──────────────────
+// The admin template is the primary instruction. We only append a short addendum:
+//   1. Per-slot variation (for uniqueness across 10+ images)
+//   2. Circle rule (don't double-circle, preserve the original one)
+// This keeps the template fully in control — nothing is overridden.
+function appendSlotVariation(templatePrompt: string, slotIndex: number, hasBaseImage: boolean): string {
+  if (!hasBaseImage) return templatePrompt;
+  const variation = getImageVariation(slotIndex);
+  return (
+    templatePrompt +
+    `\n\n================================================================================\n` +
+    `SLOT VARIATION #${slotIndex + 1} OF 10 — APPLY FOR UNIQUENESS\n` +
+    `================================================================================\n` +
+    `For this specific slot, apply this visual style to differentiate it from other slots:\n` +
+    `${variation}\n\n` +
+    `CIRCLE RULE (CRITICAL): The base image already has a circular portrait overlay (white-bordered\n` +
+    `circle, top-left corner, showing a person's face). You MUST preserve this circle EXACTLY as-is —\n` +
+    `same position, same white border, same face inside. Do NOT add a second circle on top of it.\n` +
+    `The output must have EXACTLY ONE circle — the original one from the base image.`
+  );
+}
+
 // ── Build an EDIT-mode image prompt when a base image is present ─────────────
 // Rules enforced on every edit regardless of template content:
 //   1. PRESERVE the circular portrait overlay (top-left circle with person inside) EXACTLY
@@ -194,10 +216,10 @@ async function resolveSlotPrompt(
     }
 
     if (slot.slotType === 'image' && imageTxt) {
-      // Wrap the admin's image instructions with the full edit rules + per-slot variation.
-      // This ensures circle preservation, text removal, and uniqueness on every slot.
+      // The admin template is the PRIMARY instruction — use it verbatim as the base.
+      // Only append the per-slot variation + circle rule so the template stays in control.
       const slotIdx = snap.index !== undefined ? Number(snap.index) : (slot.slotIndex ?? 0);
-      const prompt = wrapWithEditInstruction(imageTxt, hasBaseImage, slotIdx);
+      const prompt = appendSlotVariation(imageTxt, slotIdx, hasBaseImage);
       return { type: 'image', model: snap.model, label, prompt };
     }
 
@@ -209,7 +231,7 @@ async function resolveSlotPrompt(
     // ── Image slot with base image but no TXT instruction set ───────────────
     if (slot.slotType === 'image' && hasBaseImage) {
       const slotIdx = snap.index !== undefined ? Number(snap.index) : (slot.slotIndex ?? 0);
-      const prompt = wrapWithEditInstruction('Refine and enhance the image quality.', true, slotIdx);
+      const prompt = wrapWithEditInstruction('Refine and enhance the image quality.', true, slotIdx); // wrapWithEditInstruction used only when NO template
       return { type: 'image', model: snap.model, label, prompt };
     }
 

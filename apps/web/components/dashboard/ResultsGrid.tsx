@@ -221,9 +221,8 @@ function ImageCard({ slot, index, jobId, onRegen }: { slot: OutputSlot; index: n
     setTimeout(() => setRegenLoading(false), 5000);
   }
 
-  const snap = slot.promptSnapshot as { label?: string };
-  const label = snap.label ?? `Image ${index + 1}`;
-  const shortLabel = label.replace(/^Image \d+ — /, '').replace(/^Image \d+$/, `Slot ${index + 1}`);
+  // Always show "Image N" — no slot-type categories (DALL-E Hero Shot, Gemini Dark Drama, etc.)
+  const shortLabel = `Image ${index + 1}`;
 
   // ── PENDING / PROCESSING ─────────────────────────────────────────────────
   if (slot.status === 'PENDING' || slot.status === 'PROCESSING') {
