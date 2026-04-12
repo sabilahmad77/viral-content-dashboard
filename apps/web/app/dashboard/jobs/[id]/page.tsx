@@ -45,7 +45,7 @@ export default function JobDetailPage() {
             </div>
           )}
         </div>
-        <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.6', background: 'var(--surface-2)', padding: '12px 14px', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-mono)', fontSize: '13px' }}>
+        <p style={{ lineHeight: '1.6', background: 'var(--surface-2)', padding: '12px 14px', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--text-secondary)' }}>
           {job.newsInput}
         </p>
       </div>

@@ -18,6 +18,8 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    // Bypass localtunnel reminder page for tunnel-hosted backends
+    'bypass-tunnel-reminder': '1',
     ...(init.headers as Record<string, string>),
   };
 
