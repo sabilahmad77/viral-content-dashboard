@@ -2,6 +2,7 @@ import db from '../lib/db';
 import { jobQueue } from '../lib/queue';
 import { generateCaptionOpenAI, generateImageDalle, editImageGPT, probeApiHealth, validateCaptionStructure } from '../services/openai';
 import { generateCaptionGemini, generateImageGemini, GeminiImageUnavailableError } from '../services/gemini';
+import { editImageFlux, FluxUnavailableError } from '../services/flux';
 import { generateVideoKling } from '../services/kling';
 import { uploadUrlToR2, uploadToR2 } from '../services/storage';
 import { hashPrompt, getCached, setCached } from '../lib/cache';
@@ -329,12 +330,12 @@ async function processSlot(
       let url: string;
 
       if (baseImageUrl) {
-        // ── BASE IMAGE PRESENT: use real image editing (gpt-image-1 edit API) ──
-        // Req 1-2, 17-18, 20: NOT text-to-image. The actual uploaded image bytes
-        // are sent to the API and an edited version is returned.
-        console.log(`  🖼 [slot ${slot.slotIndex}] Editing base image via gpt-image-1 (model=${model})`);
+        // ── BASE IMAGE PRESENT: real image editing ─────────────────────────────
+        // Provider sequence: slots 0-2 = Gemini, 3-5 = OpenAI, 6-8 = FLUX (repeating)
+        console.log(`  🖼 [slot ${slot.slotIndex}] Editing base image (provider=${model})`);
 
         if (model === 'gemini-imagen') {
+          // SLOTS 0-2, 9-11, … → Gemini image editing
           try {
             url = await generateImageGemini(prompt, baseImageUrl);
             url = await handleDataUrl(url, slot.jobId, slot.id, 'png', 'image/png');
@@ -345,8 +346,21 @@ async function processSlot(
               url = await handleDataUrl(url, slot.jobId, slot.id, 'png', 'image/png');
             } else { throw err; }
           }
+        } else if (model === 'flux') {
+          // SLOTS 6-8, 15-17, … → FLUX.1 Kontext via fal.ai
+          // Falls back to gpt-image-1 automatically when FAL_KEY is not yet set
+          try {
+            url = await editImageFlux(prompt, baseImageUrl);
+            url = await handleDataUrl(url, slot.jobId, slot.id, 'jpg', 'image/jpeg');
+          } catch (err) {
+            if (err instanceof FluxUnavailableError) {
+              console.log(`  ↳ FLUX unavailable — falling back to gpt-image-1 edit`);
+              url = await editImageGPT(prompt, baseImageUrl);
+              url = await handleDataUrl(url, slot.jobId, slot.id, 'png', 'image/png');
+            } else { throw err; }
+          }
         } else {
-          // openai-dalle slots with base image → gpt-image-1 edit (never DALL-E 3 generate)
+          // SLOTS 3-5, 12-14, … → OpenAI gpt-image-1 edit
           url = await editImageGPT(prompt, baseImageUrl);
           url = await handleDataUrl(url, slot.jobId, slot.id, 'png', 'image/png');
         }
@@ -568,4 +582,4 @@ jobQueue.on('job', async (job: { id: string; data: { jobId: string } }) => {
   }
 });
 
-console.log('✅ Job worker ready — v12: lighting-only-variations, subject-preservation-enforced, no-double-circle, context-preserving-backgrounds');
+console.log('✅ Job worker ready — v13: Gemini→OpenAI→FLUX provider sequence, image-count controlled, subject-preservation, no-double-circle');

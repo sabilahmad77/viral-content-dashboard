@@ -6,6 +6,7 @@ import { requireAuth } from '../middleware/auth';
 import { jobQueue } from '../lib/queue';
 import { uploadToR2 } from '../services/storage';
 import { buildCaptionSystemPrompt, buildImagePrompt } from './templates';
+import { getProviderForImageSlot } from '../lib/providerSequence';
 import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
@@ -24,6 +25,8 @@ const createJobSchema = z.object({
   // newsInput is optional for image-only mode (user may supply only a base image)
   newsInput: z.string().max(2000).default(''),
   mode: z.enum(['content', 'images', 'all']).default('all'),
+  // imageCount: how many images to generate (1–20). Defaults to 10.
+  imageCount: z.coerce.number().int().min(1).max(20).default(10),
 }).refine((data) => {
   // Captions always require text (no text = no captions possible)
   if (data.mode === 'content' || data.mode === 'all') {
@@ -79,17 +82,15 @@ router.post('/', requireAuth, upload.single('baseImage'), async (req: Request, r
     }
   }
 
-  let slots = parseSlots(activeTemplate.slots);
-  // Filter slots by mode: 'content' = captions only, 'images' = images only, 'all' = everything
-  if (result.data.mode === 'content') {
-    slots = slots.filter((s) => String(s.type) === 'caption');
-  } else if (result.data.mode === 'images') {
-    slots = slots.filter((s) => String(s.type) === 'image');
-  }
+  // Caption slots — always sourced from the active template
+  const allSlots = parseSlots(activeTemplate.slots);
+  const captionSlots = allSlots.filter((s) => String(s.type) === 'caption');
   const captionJson = parseJsonObj(activeTemplate.captionPromptJson);
   const imageJson = parseJsonObj(activeTemplate.imagePromptJson);
   const hasCaptionJson = Object.keys(captionJson).length > 0;
   const hasImageJson = Object.keys(imageJson).length > 0;
+
+  const { mode, imageCount, newsInput } = result.data;
 
   const job = await db.$transaction(async (tx) => {
     const newJob = await tx.job.create({
@@ -97,60 +98,69 @@ router.post('/', requireAuth, upload.single('baseImage'), async (req: Request, r
         userId: req.user!.userId,
         templateId: activeTemplate.id,
         templateVersion: activeTemplate.version,
-        newsInput: result.data.newsInput,
+        newsInput,
         baseImageUrl,
         status: 'QUEUED',
       },
     });
 
-    await tx.outputSlot.createMany({
-      data: slots.map((slot) => {
-        const label = String(slot.label ?? '');
-        const promptSnapshot: Record<string, unknown> = {
-          type: slot.type, index: slot.index, label, model: slot.model,
-        };
-        if (slot.type === 'caption') {
-          // Always drive from captionPromptJson if set; fall back to slot defaults only if JSON is empty
+    // ── Caption slots (from template) ──────────────────────────────────────────
+    const captionSlotData = (mode === 'content' || mode === 'all')
+      ? captionSlots.map((slot) => {
+          const label = String(slot.label ?? '');
+          const promptSnapshot: Record<string, unknown> = { type: 'caption', index: slot.index, label, model: slot.model };
           if (hasCaptionJson) {
             promptSnapshot.system = buildCaptionSystemPrompt(captionJson, label);
-            promptSnapshot.user = result.data.newsInput
-              ? `Topic/Content: ${result.data.newsInput}`
+            promptSnapshot.user = newsInput
+              ? `Topic/Content: ${newsInput}`
               : 'Generate the caption based on the provided rules.';
           } else {
-            // No JSON configured — use slot-level defaults from template
             promptSnapshot.system = slot.system;
-            promptSnapshot.user = renderPrompt(String(slot.user ?? ''), result.data.newsInput);
+            promptSnapshot.user = renderPrompt(String(slot.user ?? ''), newsInput);
           }
-        } else if (slot.type === 'image') {
-          // Always drive from imagePromptJson if set; fall back to slot defaults only if JSON is empty
+          return {
+            jobId: newJob.id,
+            slotType: 'caption',
+            slotIndex: Number(slot.index),
+            status: 'PENDING',
+            promptSnapshot: JSON.stringify(promptSnapshot),
+            modelUsed: String(slot.model),
+          };
+        })
+      : [];
+
+    // ── Image slots (provider sequence: Gemini→OpenAI→FLUX in groups of 3) ────
+    // Created dynamically — imageCount controls exactly how many are generated.
+    // Provider assignment: slots 0-2=Gemini, 3-5=OpenAI, 6-8=FLUX, 9-11=Gemini…
+    const imageSlotData = (mode === 'images' || mode === 'all')
+      ? Array.from({ length: imageCount }, (_, i) => {
+          const provider = getProviderForImageSlot(i);
+          const promptSnapshot: Record<string, unknown> = {
+            type: 'image', index: i, label: `Image ${i + 1}`, model: provider,
+          };
           if (hasImageJson) {
-            promptSnapshot.prompt = buildImagePrompt(imageJson, label, result.data.newsInput);
-          } else {
-            // No JSON configured — use slot-level defaults from template
-            const base = renderPrompt(String(slot.prompt ?? ''), result.data.newsInput);
-            promptSnapshot.prompt = base;
+            promptSnapshot.prompt = buildImagePrompt(imageJson, `Image ${i + 1}`, newsInput);
           }
-        } else {
-          promptSnapshot.prompt = renderPrompt(String(slot.prompt ?? ''), result.data.newsInput);
-        }
-        return {
-          jobId: newJob.id,
-          slotType: String(slot.type),
-          slotIndex: Number(slot.index),
-          status: 'PENDING',
-          promptSnapshot: JSON.stringify(promptSnapshot),
-          modelUsed: String(slot.model),
-        };
-      }),
-    });
+          return {
+            jobId: newJob.id,
+            slotType: 'image',
+            slotIndex: i,
+            status: 'PENDING',
+            promptSnapshot: JSON.stringify(promptSnapshot),
+            modelUsed: provider,
+          };
+        })
+      : [];
+
+    await tx.outputSlot.createMany({ data: [...captionSlotData, ...imageSlotData] });
 
     return newJob;
   });
 
   await jobQueue.add('process-job', { jobId: job.id }, { jobId: job.id });
 
-  const hasVideo = slots.some((s) => s.type === 'video');
-  res.status(202).json({ jobId: job.id, slotCount: slots.length, estimatedSeconds: hasVideo ? 120 : 30 });
+  const totalSlots = (mode === 'images' ? imageCount : 0) + (mode === 'content' || mode === 'all' ? captionSlots.length : 0) + (mode === 'all' ? imageCount : 0);
+  res.status(202).json({ jobId: job.id, slotCount: totalSlots, imageCount: mode !== 'content' ? imageCount : 0, estimatedSeconds: 30 });
 });
 
 // GET /api/jobs

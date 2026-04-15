@@ -8,6 +8,7 @@ import {
   validateCaptionStructure,
 } from '../services/openai';
 import { generateCaptionGemini, generateImageGemini, GeminiImageUnavailableError } from '../services/gemini';
+import { editImageFlux, FluxUnavailableError } from '../services/flux';
 // addCircularOverlay removed — circle is preserved by the AI edit prompt, not added programmatically
 import { config } from '../lib/config';
 import { v4 as uuidv4 } from 'uuid';
@@ -210,9 +211,8 @@ async function callAI(
     let url: string;
 
     if (baseImageUrl) {
-      // Req 1-2, 21-22: Real image editing — NOT text-to-image.
-      // Recreate always restarts from the original baseImageUrl stored on the job.
-      console.log(`  🖼 [regen ${slotId}] Editing base image via gpt-image-1 (model=${model})`);
+      // Real image editing — provider sequence matches initial generation
+      console.log(`  🖼 [regen ${slotId}] Editing base image (provider=${model})`);
 
       if (model === 'gemini-imagen') {
         try {
@@ -223,14 +223,24 @@ async function callAI(
             url = await editImageGPT(prompt, baseImageUrl);
           } else { throw err; }
         }
+        url = await resolveOutputUrl(url, jobId, slotId, regenVersion, 'png', 'image/png');
+      } else if (model === 'flux') {
+        try {
+          url = await editImageFlux(prompt, baseImageUrl);
+          url = await resolveOutputUrl(url, jobId, slotId, regenVersion, 'jpg', 'image/jpeg');
+        } catch (err) {
+          if (err instanceof FluxUnavailableError) {
+            console.log(`  ↳ FLUX unavailable, falling back to gpt-image-1 edit`);
+            url = await editImageGPT(prompt, baseImageUrl);
+            url = await resolveOutputUrl(url, jobId, slotId, regenVersion, 'png', 'image/png');
+          } else { throw err; }
+        }
       } else {
-        // openai-dalle → gpt-image-1 edit (never DALL-E 3 generate)
+        // openai-dalle → gpt-image-1 edit
         url = await editImageGPT(prompt, baseImageUrl);
+        url = await resolveOutputUrl(url, jobId, slotId, regenVersion, 'png', 'image/png');
       }
-
-      // Persist data URL to R2 if configured
-      url = await resolveOutputUrl(url, jobId, slotId, regenVersion, 'png', 'image/png');
-      // No programmatic circle added — the AI edit prompt (RULE 1) preserves the existing circle.
+      // No programmatic circle added — the AI edit prompt preserves the existing circle.
 
     } else {
       // No base image — standard Gemini / DALL-E text-to-image

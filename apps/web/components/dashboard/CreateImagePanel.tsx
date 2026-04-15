@@ -21,6 +21,7 @@ export default function CreateImagePanel({ onJobCreated, templateName, templateV
   const [imageFileName, setImageFileName] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
+  const [imageCount, setImageCount] = useState(10);
   const restoredRef = useRef(false);
 
   // Restore uploaded image from sessionStorage on mount
@@ -84,6 +85,7 @@ export default function CreateImagePanel({ onJobCreated, templateName, templateV
       const fd = new FormData();
       fd.append('newsInput', '');
       fd.append('mode', 'images');
+      fd.append('imageCount', String(imageCount));
       fd.append('baseImage', imageFile);
       const { jobId } = await jobsApi.create(accessToken!, fd);
       onJobCreated(jobId);
@@ -110,7 +112,7 @@ export default function CreateImagePanel({ onJobCreated, templateName, templateV
             Create Image
           </h1>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', letterSpacing: '0.01em' }}>
-            Upload your base image — the system will generate 10 edited variations from it
+            Upload a base image — select how many variations to generate (1–20)
           </p>
         </div>
         {templateName && (
@@ -222,61 +224,119 @@ export default function CreateImagePanel({ onJobCreated, templateName, templateV
         </div>
       )}
 
-      {/* Generate button */}
-      <button
-        onClick={handleGenerate}
-        disabled={!canGenerate}
-        style={{
-          width: '100%', height: '52px',
-          background: canGenerate
-            ? 'linear-gradient(135deg, #0891B2 0%, #22D3EE 100%)'
-            : 'var(--surface-3)',
-          color: canGenerate ? '#fff' : 'var(--text-muted)',
-          border: canGenerate ? 'none' : '1px solid var(--border)',
-          borderRadius: 'var(--radius-md)',
-          fontSize: '14px', fontWeight: 700,
-          cursor: canGenerate ? 'pointer' : 'not-allowed',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '9px',
-          transition: 'all 0.2s ease',
-          boxShadow: canGenerate ? '0 4px 20px rgba(34,211,238,0.35), inset 0 1px 0 rgba(255,255,255,0.15)' : 'none',
-          letterSpacing: '0.02em',
-        }}
-        onMouseEnter={(e) => {
-          if (canGenerate) {
-            (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)';
-            (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 6px 24px rgba(34,211,238,0.5), inset 0 1px 0 rgba(255,255,255,0.15)';
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (canGenerate) {
-            (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)';
-            (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 20px rgba(34,211,238,0.35), inset 0 1px 0 rgba(255,255,255,0.15)';
-          }
-        }}
-      >
-        {isGenerating ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {[0, 0.18, 0.36].map((delay, i) => (
-              <span key={i} className="pulse" style={{
-                display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
-                background: '#fff', animationDelay: `${delay}s`,
-              }} />
-            ))}
-            <span style={{ marginLeft: '2px' }}>Generating images...</span>
-          </div>
-        ) : (
-          <>
-            <ImageIcon size={17} />
-            Generate Image
-          </>
-        )}
-      </button>
+      {/* Count selector + Generate button */}
+      <div style={{ display: 'flex', gap: '10px', alignItems: 'stretch' }}>
 
-      {!imageFile && (
-        <div style={{ textAlign: 'center', marginTop: '10px', fontSize: '11px', color: 'var(--text-muted)' }}>
-          Upload a base image to enable generation
+        {/* Image count dropdown */}
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <select
+            value={imageCount}
+            onChange={(e) => setImageCount(Number(e.target.value))}
+            disabled={isGenerating}
+            style={{
+              height: '52px',
+              padding: '0 36px 0 14px',
+              background: 'var(--surface-2)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: '14px', fontWeight: 700,
+              cursor: isGenerating ? 'not-allowed' : 'pointer',
+              appearance: 'none',
+              WebkitAppearance: 'none',
+              outline: 'none',
+              minWidth: '82px',
+            }}
+          >
+            <optgroup label="Standard">
+              {[1,2,3,4,5,6,7,8,9,10].map(n => (
+                <option key={n} value={n}>{n} img{n > 1 ? 's' : ''}</option>
+              ))}
+            </optgroup>
+            <optgroup label="Extended">
+              {[11,12,13,14,15,16,17,18,19,20].map(n => (
+                <option key={n} value={n}>{n} imgs</option>
+              ))}
+            </optgroup>
+          </select>
+          {/* Custom chevron */}
+          <svg
+            style={{ position: 'absolute', right: '11px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', opacity: 0.5 }}
+            width="12" height="12" viewBox="0 0 12 12" fill="none"
+          >
+            <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
         </div>
-      )}
+
+        {/* Generate button */}
+        <button
+          onClick={handleGenerate}
+          disabled={!canGenerate}
+          style={{
+            flex: 1, height: '52px',
+            background: canGenerate
+              ? 'linear-gradient(135deg, #0891B2 0%, #22D3EE 100%)'
+              : 'var(--surface-3)',
+            color: canGenerate ? '#fff' : 'var(--text-muted)',
+            border: canGenerate ? 'none' : '1px solid var(--border)',
+            borderRadius: 'var(--radius-md)',
+            fontSize: '14px', fontWeight: 700,
+            cursor: canGenerate ? 'pointer' : 'not-allowed',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '9px',
+            transition: 'all 0.2s ease',
+            boxShadow: canGenerate ? '0 4px 20px rgba(34,211,238,0.35), inset 0 1px 0 rgba(255,255,255,0.15)' : 'none',
+            letterSpacing: '0.02em',
+          }}
+          onMouseEnter={(e) => {
+            if (canGenerate) {
+              (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)';
+              (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 6px 24px rgba(34,211,238,0.5), inset 0 1px 0 rgba(255,255,255,0.15)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (canGenerate) {
+              (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)';
+              (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 20px rgba(34,211,238,0.35), inset 0 1px 0 rgba(255,255,255,0.15)';
+            }
+          }}
+        >
+          {isGenerating ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {[0, 0.18, 0.36].map((delay, i) => (
+                <span key={i} className="pulse" style={{
+                  display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
+                  background: '#fff', animationDelay: `${delay}s`,
+                }} />
+              ))}
+              <span style={{ marginLeft: '2px' }}>Generating {imageCount} image{imageCount > 1 ? 's' : ''}...</span>
+            </div>
+          ) : (
+            <>
+              <ImageIcon size={17} />
+              Generate {imageCount} Image{imageCount > 1 ? 's' : ''}
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Provider sequence hint */}
+      <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', letterSpacing: '0.01em' }}>
+        {!imageFile
+          ? 'Upload a base image to enable generation'
+          : (() => {
+              const g = Math.min(imageCount, 3);
+              const o = Math.min(Math.max(imageCount - 3, 0), 3);
+              const f = Math.min(Math.max(imageCount - 6, 0), 3);
+              const rest = imageCount > 9 ? ` + ${imageCount - 9} more` : '';
+              const parts = [
+                g > 0 && `${g} via Gemini`,
+                o > 0 && `${o} via OpenAI`,
+                f > 0 && `${f} via FLUX`,
+              ].filter(Boolean).join(' · ');
+              return parts + rest;
+            })()
+        }
+      </div>
     </div>
   );
 }
