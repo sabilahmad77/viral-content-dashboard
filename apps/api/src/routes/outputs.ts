@@ -68,59 +68,13 @@ async function resolveOutputUrl(
   return url;
 }
 
-// ── 10 distinct visual variations (mirrors jobWorker) ────────────────────────
-// IMPORTANT: Variations are LIGHTING ONLY.
-// Explicit clothing color instructions cause the AI to redesign the entire outfit.
-// Lighting naturally affects perceived color — that is the only acceptable change.
-const IMAGE_VARIATIONS: string[] = [
-  'LIGHTING ONLY: Apply cool morning blue-tinted daylight — shift the entire scene to a cool, crisp blue atmosphere.',
-  'LIGHTING ONLY: Apply dramatic overcast grey — shift scene to muted, stormy, desaturated tones.',
-  'LIGHTING ONLY: Apply warm golden-hour lighting — bathe the entire scene in amber and orange glow.',
-  'LIGHTING ONLY: Apply strong directional side-key light from the left — creates natural shadows across the scene.',
-  'LIGHTING ONLY: Apply clean, even, soft front-fill daylight — eliminate harsh shadows, bright and clear.',
-  'LIGHTING ONLY: Apply bright warm outdoor sunlight from slightly above — natural warmth, sunlit highlights.',
-  'LIGHTING ONLY: Apply cool formal indoor lighting — controlled, blue-white, professional temperature.',
-  'LIGHTING ONLY: Apply dramatic low uplight from below — shadows cast dramatically upward.',
-  'LIGHTING ONLY: Apply soft warm overhead diffuse light — gentle, warm, ceiling-lit quality.',
-  'LIGHTING ONLY: Apply crisp sharp cool-temperature daylight — high clarity, cool tones, sharp detail.',
-];
-
-// Append variation + preservation rules to the template (template stays primary).
-// regenOffset shifts the variation index on each Recreate so you never get the same result twice.
+// ── Template-first slot execution ────────────────────────────────────────────
+// The admin template IS the complete instruction. Nothing added overrides it.
+// regenOffset ensures Recreate picks a different cache key each time → different result.
 function appendSlotVariation(templatePrompt: string, slotIndex: number, hasBaseImage: boolean, regenOffset = 0): string {
   if (!hasBaseImage) return templatePrompt;
-  const variationIdx = (slotIndex + regenOffset) % IMAGE_VARIATIONS.length;
-  const variation = IMAGE_VARIATIONS[variationIdx];
-  return (
-    templatePrompt +
-    `\n\n================================================================================\n` +
-    `SLOT VARIATION #${variationIdx + 1} — LIGHTING ONLY\n` +
-    `================================================================================\n` +
-    `Apply ONLY this lighting change to differentiate this slot from others:\n` +
-    `${variation}\n\n` +
-    `================================================================================\n` +
-    `SUBJECT PRESERVATION — NON-NEGOTIABLE (apply before anything else)\n` +
-    `================================================================================\n` +
-    `1. FACE IDENTITY: The main subject's face must be 100% preserved — same person, same face\n` +
-    `   structure, same features. Do NOT alter, remodel, or reimagine the face in any way.\n` +
-    `2. FACE DIRECTION: A tiny turn is allowed (maximum ±5 degrees). No more than that.\n` +
-    `3. CLOTHING: The style, cut, design, and color of all clothing must remain IDENTICAL to the\n` +
-    `   original. Do NOT recolor, redesign, or replace any garment. The lighting change above will\n` +
-    `   naturally affect how colors appear — that is the ONLY acceptable clothing change.\n` +
-    `4. BODY & POSE: The subject's body shape, posture, and positioning must match the original exactly.\n` +
-    `5. NO REIMAGINING: Do not creatively reimagine, redesign, or significantly alter the subject.\n\n` +
-    `================================================================================\n` +
-    `BACKGROUND RULE — KEEP LOCATION, SHIFT TONES ONLY\n` +
-    `================================================================================\n` +
-    `Keep the original background location and scene exactly. Only shift its lighting and color tones\n` +
-    `per the variation above. NEVER replace with a plain solid color (no white/black/grey backdrop).\n\n` +
-    `================================================================================\n` +
-    `CIRCLE RULE — ONE CIRCLE ONLY\n` +
-    `================================================================================\n` +
-    `The base image has a circular portrait overlay (white-bordered circle, top-left, showing a face).\n` +
-    `Preserve it EXACTLY — same position, same size, same white border, same face inside.\n` +
-    `Do NOT add a second circle. Output must have EXACTLY ONE circle.`
-  );
+  const instanceId = slotIndex + regenOffset;
+  return templatePrompt + `\n\n[Image slot ${instanceId + 1} — follow all template instructions exactly as written above.]`;
 }
 
 // ── Resolve the live prompt for this slot ─────────────────────────────────────

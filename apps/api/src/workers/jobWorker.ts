@@ -99,67 +99,14 @@ async function handleDataUrl(dataUrl: string, jobId: string, slotId: string, ext
   return uploadToR2(buffer, key, mimeType);
 }
 
-// ── 10 distinct visual variations for image uniqueness ───────────────────────
-// IMPORTANT: Variations are LIGHTING ONLY.
-// - Do NOT instruct clothing color changes — lighting naturally affects perceived color.
-//   Explicit color change instructions cause the AI to redesign the entire outfit.
-// - Do NOT instruct face or pose changes — those are handled by the subject-preservation rules.
-// - NEVER replace the background location — only shift its lighting and color tones.
-const IMAGE_VARIATIONS: string[] = [
-  'LIGHTING ONLY: Apply cool morning blue-tinted daylight — shift the entire scene to a cool, crisp blue atmosphere.',
-  'LIGHTING ONLY: Apply dramatic overcast grey — shift scene to muted, stormy, desaturated tones.',
-  'LIGHTING ONLY: Apply warm golden-hour lighting — bathe the entire scene in amber and orange glow.',
-  'LIGHTING ONLY: Apply strong directional side-key light from the left — creates natural shadows across the scene.',
-  'LIGHTING ONLY: Apply clean, even, soft front-fill daylight — eliminate harsh shadows, bright and clear.',
-  'LIGHTING ONLY: Apply bright warm outdoor sunlight from slightly above — natural warmth, sunlit highlights.',
-  'LIGHTING ONLY: Apply cool formal indoor lighting — controlled, blue-white, professional temperature.',
-  'LIGHTING ONLY: Apply dramatic low uplight from below — shadows cast dramatically upward.',
-  'LIGHTING ONLY: Apply soft warm overhead diffuse light — gentle, warm, ceiling-lit quality.',
-  'LIGHTING ONLY: Apply crisp sharp cool-temperature daylight — high clarity, cool tones, sharp detail.',
-];
-
-function getImageVariation(slotIndex: number): string {
-  return IMAGE_VARIATIONS[slotIndex % IMAGE_VARIATIONS.length];
-}
-
-// ── Append variation + circle rule to the EXISTING template ──────────────────
-// The admin template is the primary instruction. We only append a short addendum:
-//   1. Per-slot variation (for uniqueness across 10+ images)
-//   2. Circle rule (don't double-circle, preserve the original one)
-// This keeps the template fully in control — nothing is overridden.
+// ── Template-first slot execution ────────────────────────────────────────────
+// The admin template IS the complete instruction. Nothing is added that overrides it.
+// The only thing appended is a slot identifier so each generation call is unique
+// (prevents cache from returning identical results for every slot).
 function appendSlotVariation(templatePrompt: string, slotIndex: number, hasBaseImage: boolean): string {
   if (!hasBaseImage) return templatePrompt;
-  const variation = getImageVariation(slotIndex);
-  return (
-    templatePrompt +
-    `\n\n================================================================================\n` +
-    `SLOT VARIATION #${slotIndex + 1} — LIGHTING ONLY\n` +
-    `================================================================================\n` +
-    `Apply ONLY this lighting change to differentiate this slot from others:\n` +
-    `${variation}\n\n` +
-    `================================================================================\n` +
-    `SUBJECT PRESERVATION — NON-NEGOTIABLE (apply before anything else)\n` +
-    `================================================================================\n` +
-    `1. FACE IDENTITY: The main subject's face must be 100% preserved — same person, same face\n` +
-    `   structure, same features. Do NOT alter, remodel, or reimagine the face in any way.\n` +
-    `2. FACE DIRECTION: A tiny turn is allowed (maximum ±5 degrees). No more than that.\n` +
-    `3. CLOTHING: The style, cut, design, and color of all clothing must remain IDENTICAL to the\n` +
-    `   original. Do NOT recolor, redesign, or replace any garment. The lighting change above will\n` +
-    `   naturally affect how colors appear — that is the ONLY acceptable clothing change.\n` +
-    `4. BODY & POSE: The subject's body shape, posture, and positioning must match the original exactly.\n` +
-    `5. NO REIMAGINING: Do not creatively reimagine, redesign, or significantly alter the subject.\n\n` +
-    `================================================================================\n` +
-    `BACKGROUND RULE — KEEP LOCATION, SHIFT TONES ONLY\n` +
-    `================================================================================\n` +
-    `Keep the original background location and scene exactly. Only shift its lighting and color tones\n` +
-    `per the variation above. NEVER replace with a plain solid color (no white/black/grey backdrop).\n\n` +
-    `================================================================================\n` +
-    `CIRCLE RULE — ONE CIRCLE ONLY\n` +
-    `================================================================================\n` +
-    `The base image has a circular portrait overlay (white-bordered circle, top-left, showing a face).\n` +
-    `Preserve it EXACTLY — same position, same size, same white border, same face inside.\n` +
-    `Do NOT add a second circle. Output must have EXACTLY ONE circle.`
-  );
+  // Minimal append — just makes each slot's cache key unique without overriding template
+  return templatePrompt + `\n\n[Image slot ${slotIndex + 1} — follow all template instructions exactly as written above.]`;
 }
 
 // ── Build an EDIT-mode image prompt when a base image is present ─────────────
@@ -173,7 +120,7 @@ function appendSlotVariation(templatePrompt: string, slotIndex: number, hasBaseI
 //   7. Apply the variation style for this slot to ensure uniqueness
 function wrapWithEditInstruction(slotPrompt: string, hasBaseImage: boolean, slotIndex = 0): string {
   if (!hasBaseImage) return slotPrompt;
-  const variation = getImageVariation(slotIndex);
+  const variation = `slot ${slotIndex + 1}`;
   return (
     `Edit the uploaded base image following these rules in strict order:\n\n` +
 
@@ -582,4 +529,4 @@ jobQueue.on('job', async (job: { id: string; data: { jobId: string } }) => {
   }
 });
 
-console.log('✅ Job worker ready — v13: Gemini→OpenAI→FLUX provider sequence, image-count controlled, subject-preservation, no-double-circle');
+console.log('✅ Job worker ready — v14: imageCount enforced, template-only prompts, Gemini→OpenAI→FLUX sequence, no-double-circle');

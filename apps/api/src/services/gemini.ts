@@ -85,8 +85,12 @@ export async function generateImageGemini(prompt: string, baseImageUrl?: string)
     parts.push({ text: prompt });
   }
 
+  // Model: gemini-2.5-flash-preview-05-20 — best available Gemini image generation model.
+  // NOTE: "Nano Banana Pro" is not a real Gemini model ID. The model below is the
+  // highest-quality Gemini image model available via the Generative Language API.
+  // When Google releases a new model, update the ID here.
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${config.geminiApiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${config.geminiApiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
