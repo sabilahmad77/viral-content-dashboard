@@ -1,4 +1,11 @@
 import 'dotenv/config';
+
+// ── Startup diagnostics (Railway debugging) ──────────────────────────────────
+console.log('🚀 Starting API server...');
+console.log(`   NODE_ENV  = ${process.env.NODE_ENV}`);
+console.log(`   PORT      = ${process.env.PORT}`);
+console.log(`   DB URL    = ${process.env.DATABASE_URL ? process.env.DATABASE_URL.replace(/:\/\/.*@/, '://***@') : 'NOT SET'}`);
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
