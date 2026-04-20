@@ -16,4 +16,4 @@ RUN npm run build
 
 EXPOSE 3001
 
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node dist/index.js"]
+CMD ["sh", "-c", "echo '=== STARTUP ===' && echo PORT=$PORT && echo NODE_ENV=$NODE_ENV && npx prisma db push --accept-data-loss 2>&1; echo '=== STARTING NODE ===' && exec node dist/index.js 2>&1"]
