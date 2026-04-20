@@ -2,8 +2,11 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// Provider switches automatically:
+// - Local dev: DATABASE_URL="file:./dev.db" → sqlite
+// - Railway:   DATABASE_URL="postgresql://..." → postgresql
 datasource db {
-  provider = "sqlite"
+  provider = env("DB_PROVIDER")
   url      = env("DATABASE_URL")
 }
 
