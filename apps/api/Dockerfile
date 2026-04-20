@@ -1,31 +1,28 @@
 FROM node:20-alpine
 
-# Install pnpm + build deps for native modules (sharp)
-RUN apk add --no-cache python3 make g++ && npm install -g pnpm
+# Install build deps for native modules (sharp, bcrypt, etc.)
+RUN apk add --no-cache python3 make g++
 
 WORKDIR /app
 
-# Copy workspace manifests
-COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
-COPY apps/api/package.json apps/api/package.json
-COPY apps/api/prisma apps/api/prisma
+# Copy package files first for better layer caching
+COPY package.json ./
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile --filter api...
+# Install all dependencies
+RUN npm install
 
-# Copy API source
-COPY apps/api apps/api
+# Copy prisma schema and generate client
+COPY prisma ./prisma
+RUN npx prisma generate
 
-# Generate Prisma client
-RUN cd apps/api && npx prisma generate
+# Copy rest of source
+COPY . .
 
 # Build TypeScript
-RUN cd apps/api && npx tsc
+RUN npm run build
 
-# Create data directory for SQLite persistence
-RUN mkdir -p /data
-
+# Expose port
 EXPOSE 3001
 
-# On start: run migrations then start server
-CMD sh -c "cd apps/api && npx prisma migrate deploy && node dist/index.js"
+# Start: push DB schema then run server
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node dist/index.js"]
