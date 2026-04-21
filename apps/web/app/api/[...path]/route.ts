@@ -7,7 +7,7 @@
 
 export const dynamic = 'force-dynamic';
 
-const BACKEND = process.env.API_URL || 'http://localhost:3001';
+const BACKEND = process.env.API_URL || 'https://reasonable-abundance-production-05bb.up.railway.app';
 
 async function proxy(req: Request, params: { path: string[] }): Promise<Response> {
   const pathStr = params.path.join('/');
