@@ -64,10 +64,10 @@ app.use('/api/videos', videoRoutes);
 
 app.use(errorHandler);
 
-app.listen(config.port, () => {
-  console.log(`\n✅ Viral Content Dashboard API running`);
-  console.log(`   → http://localhost:${config.port}`);
-  console.log(`   → Health: http://localhost:${config.port}/health\n`);
+app.listen(config.port, '0.0.0.0', () => {
+  process.stdout.write(`\n✅ Viral Content Dashboard API running\n`);
+  process.stdout.write(`   → http://0.0.0.0:${config.port}\n`);
+  process.stdout.write(`   → Health: http://0.0.0.0:${config.port}/health\n\n`);
 });
 
 export default app;
