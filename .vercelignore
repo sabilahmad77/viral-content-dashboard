@@ -1,1 +1,10 @@
-apps/api
+# Exclude Railway/Docker deployment config — NOT needed in Vercel build
+apps/api/Dockerfile
+apps/api/.dockerignore
+apps/api/nixpacks.toml
+apps/api/railway.toml
+apps/api/vercel.json
+
+# Exclude compiled output and local node_modules (already gitignored, but explicit here)
+apps/api/dist
+apps/api/node_modules

@@ -16,6 +16,19 @@ const nextConfig = {
       { protocol: 'https', hostname: '**.loca.lt' },
     ],
   },
+  // Prevent webpack from bundling server-only packages that have native binaries
+  // or must remain as Node.js require() calls in the serverless function bundle.
+  experimental: {
+    serverComponentsExternalPackages: [
+      '@prisma/client',
+      'prisma',
+      'sharp',
+      'bcryptjs',
+      'multer',
+      '@aws-sdk/client-s3',
+      '@aws-sdk/s3-request-presigner',
+    ],
+  },
 };
 
 module.exports = nextConfig;
