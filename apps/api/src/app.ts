@@ -2,8 +2,9 @@
  * Express app factory — shared between the Node server (src/index.ts)
  * and the Vercel serverless entry point (api/index.ts).
  * Does NOT call app.listen() and does NOT start the BullMQ worker.
+ * NOTE: dotenv is intentionally NOT imported here — env vars are injected
+ * by Vercel (production) or pre-loaded by index.ts (local dev).
  */
-import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
