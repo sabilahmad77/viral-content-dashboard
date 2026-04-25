@@ -1,4 +1,5 @@
 /** @type {import('next').NextConfig} */
+// Last updated: fix trust proxy for express-rate-limit behind Vercel edge
 const path = require('path');
 
 const nextConfig = {
