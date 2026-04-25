@@ -41,6 +41,17 @@ const nextConfig = {
       include: [path.resolve(__dirname, '..', 'api', 'src')],
       use: defaultLoaders.babel,
     });
+
+    // When webpack processes files from ../api/src/ it resolves imports by
+    // walking UP from that directory (api/src → api → apps → root).
+    // It never reaches apps/web/node_modules/ where npm installed express,
+    // cors, helmet, zod, etc.  Adding apps/web/node_modules/ as an explicit
+    // entry in resolve.modules tells webpack to always check it as a fallback.
+    config.resolve.modules = [
+      ...(config.resolve.modules || ['node_modules']),
+      path.resolve(__dirname, 'node_modules'),
+    ];
+
     return config;
   },
 };
