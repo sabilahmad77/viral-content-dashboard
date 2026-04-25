@@ -22,6 +22,11 @@ import videoRoutes from './routes/videos';
 
 const app = express();
 
+// Trust the first proxy hop (Vercel edge / Railway load balancer).
+// Required for express-rate-limit v7+ — without this it throws a hard error
+// when it sees the X-Forwarded-For header that proxies always inject.
+app.set('trust proxy', 1);
+
 app.use(helmet());
 app.use(cors({
   origin: (_origin, callback) => callback(null, true),
