@@ -1,8 +1,19 @@
 /** @type {import('next').NextConfig} */
-// Last updated: fix trust proxy for express-rate-limit behind Vercel edge
+// Last updated: bake server env vars into serverless bundle
 const path = require('path');
 
 const nextConfig = {
+  // Bake server-side env vars into the serverless function bundle.
+  // Vercel's runtime does NOT load .env.production — only build-time does.
+  // These values come from .env.production (already in process.env when
+  // next.config.js runs) and get compiled into the bundle so they're
+  // always available at runtime even without Vercel dashboard config.
+  env: {
+    DATABASE_URL: process.env.DATABASE_URL,
+    JWT_SECRET: process.env.JWT_SECRET,
+    JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
+    REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
+  },
   typescript: {
     // Skip type checking during build — checked separately via tsc
     ignoreBuildErrors: true,
